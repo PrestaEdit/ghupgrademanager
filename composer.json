@@ -1,0 +1,31 @@
+{
+    "name": "prestaedit/ghupgrademanager",
+    "description": "PrestaShop - Modules from distribution API",
+    "homepage": "https://github.com/prestaedit/ghupgrademanager",
+    "license": "AFL-3.0",
+    "authors": [
+      {
+        "name": "PrestaEdit",
+        "email": "j.danse@prestaedit.com"
+      }
+    ],
+    "require": {
+      "php": ">=7.2.5"
+    },
+    "autoload": {
+      "psr-4": {
+        "PrestaShop\\Module\\GitHubUpgradeManager\\": "src/"
+      },
+      "classmap": ["ghupgrademanager.php"]
+    },
+    "config": {
+      "preferred-install": "dist",
+      "classmap-authoritative": true,
+      "optimize-autoloader": true,
+      "prepend-autoloader": false,
+      "platform": {
+        "php": "7.2.5"
+      }
+    },
+    "type": "prestashop-module"
+  }

@@ -1,0 +1,62 @@
+parameters:
+  ps_cache_dir: !php/const _PS_CACHE_DIR_
+  env(GITHUB_TOKEN): ''
+
+services:
+  ghupgrademanager.cache.filesystem.adapter:
+    class: Symfony\Component\Cache\Adapter\FilesystemAdapter
+    arguments:
+      - ''
+      - !php/const PrestaShop\Module\GitHubUpgradeManager\UpgradeManager::CACHE_LIFETIME_SECONDS
+      - '%ps_cache_dir%/github-upgrade-manager'
+
+  ghupgrademanager.cache.provider:
+    class: Doctrine\Common\Cache\Psr6\DoctrineProvider
+    factory: [ Doctrine\Common\Cache\Psr6\DoctrineProvider, wrap ]
+    arguments:
+      - '@ghupgrademanager.cache.filesystem.adapter'
+
+  ghupgrademanager.circuit_breaker.cache:
+    class: PrestaShop\Module\GitHubUpgradeManager\Middleware\Cache
+    arguments:
+      - '@ghupgrademanager.cache.provider'
+
+  ghupgrademanager.circuit_breaker.handlerstack:
+    class: GuzzleHttp\HandlerStack
+    factory: [ 'GuzzleHttp\HandlerStack', 'create' ]
+    calls:
+      - push: [ '@ghupgrademanager.circuit_breaker.cache' ]
+
+  ghupgrademanager.circuit_breaker.factory:
+    class: PrestaShop\CircuitBreaker\AdvancedCircuitBreakerFactory
+
+  ghupgrademanager.circuit_breaker.settings:
+    class: PrestaShop\CircuitBreaker\FactorySettings
+    arguments:
+      - !php/const PrestaShop\Module\GitHubUpgradeManager\UpgradeManager::ALLOWED_FAILURES
+      - !php/const PrestaShop\Module\GitHubUpgradeManager\UpgradeManager::TIMEOUT_IN_SECONDS
+      - !php/const PrestaShop\Module\GitHubUpgradeManager\UpgradeManager::THRESHOLD_SECONDS
+    calls:
+      - setStorage: [ '@prestashop.core.circuit_breaker.storage' ]
+      - setClientOptions:
+          - { headers: {
+                Authorization: 'Bearer %env(GITHUB_TOKEN)%',
+                X-GitHub-Api-Version: '2022-11-28',
+                Accept: 'application/vnd.github+json'
+              }
+            }
+          - { handler: '@ghupgrademanager.circuit_breaker.handlerstack'}
+
+  ghupgrademanager.circuit_breaker:
+    class: PrestaShop\CircuitBreaker\Contract\CircuitBreakerInterface
+    factory: [ '@ghupgrademanager.circuit_breaker.factory', 'create' ]
+    arguments: [ '@ghupgrademanager.circuit_breaker.settings' ]
+
+  ghupgrademanager.upgrade_manager:
+    class: PrestaShop\Module\GitHubUpgradeManager\UpgradeManager
+    arguments:
+      - '@ghupgrademanager.circuit_breaker'
+      - '@prestashop.module.factory.sourcehandler'
+      - '%ps_cache_dir%'
+      - '%env(GITHUB_TOKEN)%'
+    public: true
